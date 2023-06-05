@@ -7,11 +7,17 @@ import sys
 import errno
 
 from fuse import FUSE, FuseOSError, Operations
+import telegram
+
+TELEGRAM_BOT_TOKEN = "5951682347:AAGIklUowNISaCDLO96BbZ9I3Ta1PtECLEA"
 
 
-class MyFS(Operations):
-    def __init__(self, root):
-        self.root = root
+class TELFS(Operations):
+    def __init__(self,
+                 _root,
+                 _bot_token):
+        self.root = _root
+        self.bot = telegram.Bot(_bot_token)
 
     # Helper method to get the full path of a file
     def _full_path(self, partial):
@@ -23,9 +29,9 @@ class MyFS(Operations):
     # Filesystem methods
     # ==================
 
-    def access(self, path, mode):
+    def access(self, path, amode):
         full_path = self._full_path(path)
-        if not os.access(full_path, mode):
+        if not os.access(full_path, amode):
             raise FuseOSError(errno.EACCES)
 
     def chmod(self, path, mode):
@@ -39,8 +45,15 @@ class MyFS(Operations):
     def getattr(self, path, fh=None):
         full_path = self._full_path(path)
         st = os.lstat(full_path)
-        return dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-            'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
+        return dict((key, getattr(st, key))
+                    for key in ('st_atime',
+                                'st_ctime',
+                                'st_gid',
+                                'st_mode',
+                                'st_mtime',
+                                'st_nlink',
+                                'st_size',
+                                'st_uid'))
 
     def readdir(self, path, fh):
         full_path = self._full_path(path)
@@ -54,7 +67,8 @@ class MyFS(Operations):
         pathname = os.readlink(self._full_path(path))
         if pathname.startswith("/"):
             # Path name is absolute, sanitize it.
-            return os.path.relpath(pathname, os.path.dirname(self._full_path(path)))
+            return os.path.relpath(pathname,
+                                   os.path.dirname(self._full_path(path)))
         else:
             return pathname
 
@@ -71,9 +85,17 @@ class MyFS(Operations):
     def statfs(self, path):
         full_path = self._full_path(path)
         stv = os.statvfs(full_path)
-        return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
-            'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
-            'f_frsize', 'f_namemax'))
+        return dict((key, getattr(stv, key))
+                    for key in ('f_bavail',
+                                'f_bfree',
+                                'f_blocks',
+                                'f_bsize',
+                                'f_favail',
+                                'f_ffree',
+                                'f_files',
+                                'f_flag',
+                                'f_frsize',
+                                'f_namemax'))
 
     def unlink(self, path):
         return os.unlink(self._full_path(path))
@@ -100,30 +122,35 @@ class MyFS(Operations):
     def create(self, path, mode, fi=None):
         full_path = self._full_path(path)
         return os.open(full_path, os.O_WRONLY | os.O_CREAT, mode)
-    
+
     def read(self, path, length, offset, fh):
         os.lseek(fh, offset, os.SEEK_SET)
         return os.read(fh, length)
-    
+
     def write(self, path, buf, offset, fh):
         os.lseek(fh, offset, os.SEEK_SET)
         return os.write(fh, buf)
-    
+
     def truncate(self, path, length, fh=None):
         full_path = self._full_path(path)
         with open(full_path, 'r+') as f:
             f.truncate(length)
-    
+
     def flush(self, path, fh):
         return os.fsync(fh)
-    
+
     def release(self, path, fh):
         return os.close(fh)
-    
+
     def fsync(self, path, fdatasync, fh):
         return self.flush(path, fh)
+
 
 root = sys.argv[1]
 mountpoint = sys.argv[2]
 
-fuse = FUSE(MyFS(root), mountpoint, nothreads=True, foreground=True, debug=True)
+fuse = FUSE(TELFS(root, TELEGRAM_BOT_TOKEN),
+            mountpoint,
+            nothreads=True,
+            foreground=True,
+            debug=True)
